@@ -12,6 +12,7 @@ AviUtl の拡張編集に、外部のオーディオプラグイン（VST3, CLAP
 - AviUtl 1.10 + 拡張編集 0.92
   - http://spring-fragrance.mints.ne.jp/aviutl
   - 拡張編集 0.93rc1 等の他バージョンでは動作しません。
+  - AviUtl2への対応予定は現状ありません。
 
 - Visual C++ 再頒布可能パッケージ（[2015/2017/2019/2022] の x86 対応版が必要）
   - https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist
