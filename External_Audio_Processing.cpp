@@ -1,5 +1,3 @@
-#define NOMINMAX
-#define WIN32_LEAN_AND_MEAN
 #include <Windows.h>
 #include <tchar.h>
 #include <string>
@@ -11,7 +9,6 @@
 #include <mutex>
 #include <unordered_map>
 #include <commdlg.h>
-using byte = int8_t;
 #include <exedit.hpp>
 
 #define WM_APP_UPDATE_GUI (WM_APP + 1)
@@ -166,7 +163,7 @@ bool IsHostAlive(HostState &state)
 // =================================================================
 // 拡張編集プラグイン定義
 // =================================================================
-#define PLUGIN_VERSION "v0.2.0"
+#define PLUGIN_VERSION "v0.2.1"
 #define PLUGIN_AUTHOR "BOOK25"
 #define FILTER_NAME "Audio Plugin Host"
 #define FILTER_INFO_FMT(name, ver, author) (name " " ver " by " author)
@@ -190,7 +187,7 @@ BOOL func_exit(ExEdit::Filter *efp);
 BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, AviUtl::EditHandle *editp, ExEdit::Filter *efp);
 int32_t func_window_init(HINSTANCE hinstance, HWND hwnd, int y, int base_id, int sw_param, ExEdit::Filter *efp);
 bool LaunchHostProcess(ExEdit::Filter *efp, ExEdit::FilterProcInfo *efpip, HostState &state);
-consteval ExEdit::Filter filter_template(ExEdit::Filter::Flag flag)
+static consteval ExEdit::Filter filter_template(ExEdit::Filter::Flag flag)
 {
     return {
         .flag = flag,
@@ -215,7 +212,7 @@ inline constinit auto effect = filter_template(ExEdit::Filter::Flag::Audio | ExE
 // =================================================================
 // フィルター関数実装
 // =================================================================
-BOOL SaveStateIfGuiVisible(ExEdit::Filter *efp)
+static BOOL SaveStateIfGuiVisible(ExEdit::Filter *efp)
 {
     uint32_t object_id = static_cast<uint32_t>(efp->processing);
     auto *exdata = reinterpret_cast<Exdata *>(efp->exdata_ptr);
@@ -365,7 +362,7 @@ BOOL func_proc(ExEdit::Filter *efp, ExEdit::FilterProcInfo *efpip)
 
     for (int samples_processed = 0; samples_processed < total_samples;)
     {
-        int samples_to_process = std::min(total_samples - samples_processed, MAX_BLOCK_SIZE);
+        int samples_to_process = (std::min)(total_samples - samples_processed, MAX_BLOCK_SIZE);
         float *in_l = shared_buffer;
         float *in_r = shared_buffer + MAX_BLOCK_SIZE;
         for (int i = 0; i < samples_to_process; ++i)
@@ -450,164 +447,176 @@ BOOL func_WndProc(HWND hwnd, UINT message, WPARAM wparam, LPARAM lparam, AviUtl:
         return FALSE;
     uint32_t object_id = static_cast<uint32_t>(efp->processing);
     auto *exdata = reinterpret_cast<Exdata *>(efp->exdata_ptr);
-    if (LOWORD(wparam) != ExEdit::ExtendedFilter::CommandId::EXTENDEDFILTER_PUSH_BUTTON)
-        return FALSE;
-    bool needs_update = false;
-    switch (HIWORD(wparam))
+    switch (LOWORD(wparam))
     {
-    case idx_check::select_plugin:
+    case ExEdit::ExtendedFilter::CommandId::EXTENDEDFILTER_PUSH_BUTTON:
     {
-        DbgPrint(_T("Button 'select_plugin' clicked."));
-        TCHAR aviutl_dir[MAX_PATH];
-        GetModuleFileName(NULL, aviutl_dir, MAX_PATH);
-        TCHAR *last_slash = _tcsrchr(aviutl_dir, _T('\\'));
-        if (!last_slash)
-            break;
-        *(last_slash + 1) = _T('\0');
-        TCHAR ini_path[MAX_PATH];
-        _stprintf_s(ini_path, _T("%s%s\\%s"), aviutl_dir, _T("audio_exe"), _T("audio_plugin_link.ini"));
-        TCHAR final_filter[2048] = {0};
-        TCHAR *p = final_filter;
-        const TCHAR *p_end = final_filter + (sizeof(final_filter) / sizeof(TCHAR)) - 2;
-        TCHAR combined_exts[512] = {0};
-        if (GetFileAttributes(ini_path) != INVALID_FILE_ATTRIBUTES)
+        bool needs_update = false;
+        switch (HIWORD(wparam))
         {
-            TCHAR all_keys[2048];
-            DWORD bytes_read = GetPrivateProfileString(_T("Mappings"), NULL, _T(""), all_keys, sizeof(all_keys) / sizeof(TCHAR), ini_path);
-            if (bytes_read > 0)
+        case idx_check::select_plugin:
+        {
+            DbgPrint(_T("Button 'select_plugin' clicked."));
+            TCHAR aviutl_dir[MAX_PATH];
+            GetModuleFileName(NULL, aviutl_dir, MAX_PATH);
+            TCHAR *last_slash = _tcsrchr(aviutl_dir, _T('\\'));
+            if (!last_slash)
+                break;
+            *(last_slash + 1) = _T('\0');
+            TCHAR ini_path[MAX_PATH];
+            _stprintf_s(ini_path, _T("%s%s\\%s"), aviutl_dir, _T("audio_exe"), _T("audio_plugin_link.ini"));
+            TCHAR final_filter[2048] = {0};
+            TCHAR *p = final_filter;
+            const TCHAR *p_end = final_filter + (sizeof(final_filter) / sizeof(TCHAR)) - 2;
+            TCHAR combined_exts[512] = {0};
+            if (GetFileAttributes(ini_path) != INVALID_FILE_ATTRIBUTES)
             {
-                const TCHAR *current_key = all_keys;
-                while (*current_key)
+                TCHAR all_keys[2048];
+                DWORD bytes_read = GetPrivateProfileString(_T("Mappings"), NULL, _T(""), all_keys, sizeof(all_keys) / sizeof(TCHAR), ini_path);
+                if (bytes_read > 0)
                 {
-                    if (_tcslen(combined_exts) > 0)
+                    const TCHAR *current_key = all_keys;
+                    while (*current_key)
                     {
-                        _tcscat_s(combined_exts, _T(";"));
+                        if (_tcslen(combined_exts) > 0)
+                        {
+                            _tcscat_s(combined_exts, _T(";"));
+                        }
+                        _tcscat_s(combined_exts, _T("*"));
+                        _tcscat_s(combined_exts, current_key);
+                        current_key += _tcslen(current_key) + 1;
                     }
-                    _tcscat_s(combined_exts, _T("*"));
-                    _tcscat_s(combined_exts, current_key);
-                    current_key += _tcslen(current_key) + 1;
+                    int len = _stprintf_s(p, p_end - p, _T("Audio Plugins (%s)"), combined_exts);
+                    p += len + 1;
+                    len = _stprintf_s(p, p_end - p, _T("%s"), combined_exts);
+                    p += len + 1;
+                    current_key = all_keys;
+                    while (*current_key)
+                    {
+                        TCHAR ext_upper[32];
+                        _tcscpy_s(ext_upper, current_key + 1);
+                        _tcsupr_s(ext_upper);
+                        len = _stprintf_s(p, p_end - p, _T("%s Plugins (*%s)"), ext_upper, current_key);
+                        p += len + 1;
+                        len = _stprintf_s(p, p_end - p, _T("*%s"), current_key);
+                        p += len + 1;
+                        current_key += _tcslen(current_key) + 1;
+                    }
                 }
-                int len = _stprintf_s(p, p_end - p, _T("Audio Plugins (%s)"), combined_exts);
-                p += len + 1;
-                len = _stprintf_s(p, p_end - p, _T("%s"), combined_exts);
-                p += len + 1;
-                current_key = all_keys;
-                while (*current_key)
+            }
+            int len = _stprintf_s(p, p_end - p, _T("Executable Host (*.exe)"));
+            p += len + 1;
+            len = _stprintf_s(p, p_end - p, _T("*.exe"));
+            p += len + 1;
+            len = _stprintf_s(p, p_end - p, _T("All Files (*.*)"));
+            p += len + 1;
+            len = _stprintf_s(p, p_end - p, _T("*.*"));
+            p += len + 1;
+            *p = _T('\0');
+            TCHAR szFile[MAX_PATH] = {0};
+            OPENFILENAME ofn = {0};
+            ofn.lStructSize = sizeof(ofn);
+            ofn.hwndOwner = efp->exedit_fp->hwnd;
+            ofn.lpstrFile = szFile;
+            ofn.nMaxFile = sizeof(szFile) / sizeof(TCHAR);
+            ofn.lpstrFilter = final_filter;
+            ofn.nFilterIndex = 1;
+            ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
+            if (GetOpenFileName(&ofn))
+            {
+                DbgPrint(_T("File selected: %s"), szFile);
+                efp->exfunc->set_undo(efp->processing, 0);
                 {
-                    TCHAR ext_upper[32];
-                    _tcscpy_s(ext_upper, current_key + 1);
-                    _tcsupr_s(ext_upper);
-                    len = _stprintf_s(p, p_end - p, _T("%s Plugins (*%s)"), ext_upper, current_key);
-                    p += len + 1;
-                    len = _stprintf_s(p, p_end - p, _T("*%s"), current_key);
-                    p += len + 1;
-                    current_key += _tcslen(current_key) + 1;
+                    std::lock_guard<std::mutex> lock(g_states_mutex);
+                    g_host_states.erase(object_id);
                 }
-            }
-        }
-        int len = _stprintf_s(p, p_end - p, _T("Executable Host (*.exe)"));
-        p += len + 1;
-        len = _stprintf_s(p, p_end - p, _T("*.exe"));
-        p += len + 1;
-        len = _stprintf_s(p, p_end - p, _T("All Files (*.*)"));
-        p += len + 1;
-        len = _stprintf_s(p, p_end - p, _T("*.*"));
-        p += len + 1;
-        *p = _T('\0');
-        TCHAR szFile[MAX_PATH] = {0};
-        OPENFILENAME ofn = {0};
-        ofn.lStructSize = sizeof(ofn);
-        ofn.hwndOwner = efp->exedit_fp->hwnd;
-        ofn.lpstrFile = szFile;
-        ofn.nMaxFile = sizeof(szFile) / sizeof(TCHAR);
-        ofn.lpstrFilter = final_filter;
-        ofn.nFilterIndex = 1;
-        ofn.Flags = OFN_PATHMUSTEXIST | OFN_FILEMUSTEXIST | OFN_NOCHANGEDIR;
-        if (GetOpenFileName(&ofn))
-        {
-            DbgPrint(_T("File selected: %s"), szFile);
-            efp->exfunc->set_undo(efp->processing, 0);
-            {
-                std::lock_guard<std::mutex> lock(g_states_mutex);
-                g_host_states.erase(object_id);
-            }
-            _tcscpy_s(exdata->plugin_path, MAX_PATH, szFile);
-            exdata->state_b64[0] = '\0';
-            needs_update = true;
-        }
-        else
-        {
-            if (CommDlgExtendedError() != 0)
-            {
-                DbgPrint(_T("GetOpenFileName failed with error: %ld"), CommDlgExtendedError());
+                _tcscpy_s(exdata->plugin_path, MAX_PATH, szFile);
+                exdata->state_b64[0] = '\0';
+                needs_update = true;
             }
             else
             {
-                DbgPrint(_T("GetOpenFileName cancelled by user."));
+                if (CommDlgExtendedError() != 0)
+                {
+                    DbgPrint(_T("GetOpenFileName failed with error: %ld"), CommDlgExtendedError());
+                }
+                else
+                {
+                    DbgPrint(_T("GetOpenFileName cancelled by user."));
+                }
             }
+            break;
         }
-        break;
-    }
-    case idx_check::toggle_gui:
-    {
-        DbgPrint(_T("Button 'toggle_gui' clicked."));
-        std::unique_lock<std::mutex> lock(g_states_mutex);
-        auto it = g_host_states.find(object_id);
-        if (it == g_host_states.end() || !it->second->host_running)
+        case idx_check::toggle_gui:
         {
-            lock.unlock();
-            MessageBox(efp->exedit_fp->hwnd, _T("ホストが起動していません。\n編集中に一度再生すると起動します。"), _T("情報"), MB_OK | MB_ICONINFORMATION);
-            return TRUE;
-        }
-        auto &state = *it->second;
-        if (state.temporarily_disabled)
-        {
-            lock.unlock();
-            MessageBox(efp->exedit_fp->hwnd, _T("ホストは繰り返しクラッシュしたため無効化されています。\nプラグインを再選択してください。"), _T("エラー"), MB_OK | MB_ICONERROR);
-            return TRUE;
-        }
-        if (!IsHostAlive(state))
-        {
-            lock.unlock();
-            MessageBox(efp->exedit_fp->hwnd, _T("ホストプロセスが応答しません。クラッシュした可能性があります。\n再生を再開すると、ホストの再起動が試みられます。"), _T("エラー"), MB_OK | MB_ICONERROR);
-            return TRUE;
-        }
-        bool is_hiding = state.gui_visible;
-        const char *cmd_str = is_hiding ? "hide_gui\n" : "show_gui\n";
-        char response[256];
-        if (SendCommandToHost(state, cmd_str, response, sizeof(response)))
-        {
-            if (is_hiding)
+            DbgPrint(_T("Button 'toggle_gui' clicked."));
+            std::unique_lock<std::mutex> lock(g_states_mutex);
+            auto it = g_host_states.find(object_id);
+            if (it == g_host_states.end() || !it->second->host_running)
             {
-                DbgPrint(_T("GUI hidden. Getting state to save."));
                 lock.unlock();
-                SaveStateIfGuiVisible(efp);
-                lock.lock();
+                MessageBox(efp->exedit_fp->hwnd, _T("ホストが起動していません。\n編集中に一度再生すると起動します。"), _T("情報"), MB_OK | MB_ICONINFORMATION);
+                return TRUE;
             }
-            state.gui_visible = !is_hiding;
-            needs_update = true;
-        }
-        else
-        {
-            TCHAR error_msg[256];
+            auto &state = *it->second;
+            if (state.temporarily_disabled)
+            {
+                lock.unlock();
+                MessageBox(efp->exedit_fp->hwnd, _T("ホストは繰り返しクラッシュしたため無効化されています。\nプラグインを再選択してください。"), _T("エラー"), MB_OK | MB_ICONERROR);
+                return TRUE;
+            }
             if (!IsHostAlive(state))
             {
-                _tcscpy_s(error_msg, _T("ホストプロセスが応答しません。クラッシュした可能性があります。\n再生を再開すると、ホストの再起動が試みられます。"));
+                lock.unlock();
+                MessageBox(efp->exedit_fp->hwnd, _T("ホストプロセスが応答しません。クラッシュした可能性があります。\n再生を再開すると、ホストの再起動が試みられます。"), _T("エラー"), MB_OK | MB_ICONERROR);
+                return TRUE;
+            }
+            bool is_hiding = state.gui_visible;
+            const char *cmd_str = is_hiding ? "hide_gui\n" : "show_gui\n";
+            char response[256];
+            if (SendCommandToHost(state, cmd_str, response, sizeof(response)))
+            {
+                if (is_hiding)
+                {
+                    DbgPrint(_T("GUI hidden. Getting state to save."));
+                    lock.unlock();
+                    SaveStateIfGuiVisible(efp);
+                    lock.lock();
+                }
+                state.gui_visible = !is_hiding;
+                needs_update = true;
             }
             else
             {
-                _tcscpy_s(error_msg, _T("GUIコマンドの送信に失敗しました。ホストがフリーズしている可能性があります。"));
+                TCHAR error_msg[256];
+                if (!IsHostAlive(state))
+                {
+                    _tcscpy_s(error_msg, _T("ホストプロセスが応答しません。クラッシュした可能性があります。\n再生を再開すると、ホストの再起動が試みられます。"));
+                }
+                else
+                {
+                    _tcscpy_s(error_msg, _T("GUIコマンドの送信に失敗しました。ホストがフリーズしている可能性があります。"));
+                }
+                lock.unlock();
+                MessageBox(efp->exedit_fp->hwnd, error_msg, _T("エラー"), MB_OK | MB_ICONERROR);
             }
-            lock.unlock();
-            MessageBox(efp->exedit_fp->hwnd, error_msg, _T("エラー"), MB_OK | MB_ICONERROR);
+            break;
+        }
+        }
+        if (needs_update)
+        {
+            DbgPrint(_T("Requesting filter update."));
+            efp->exedit_fp->exfunc->filter_window_update(efp->exedit_fp);
         }
         break;
     }
-    }
-    if (needs_update)
+    case ExEdit::ExtendedFilter::CommandId::EXTENDEDFILTER_DELETE_FILTER:
     {
-        DbgPrint(_T("Requesting filter update."));
-        efp->exedit_fp->exfunc->filter_window_update(efp->exedit_fp);
+        DbgPrint(_T("Filter deleted for object %u. Cleaning up host process."), object_id);
+        std::lock_guard<std::mutex> lock(g_states_mutex);
+        g_host_states.erase(object_id);
+        return TRUE;
+    }
     }
     return TRUE;
 }
@@ -658,7 +667,7 @@ int32_t func_window_init(HINSTANCE, HWND, int, int, int, ExEdit::Filter *efp)
     }
     return 0;
 }
-bool ConnectIPC(HostState &state)
+static bool ConnectIPC(HostState &state)
 {
     TCHAR name[MAX_PATH];
     _stprintf_s(name, _T("%s_%llu"), PIPE_NAME_BASE, state.unique_id);
@@ -764,7 +773,12 @@ bool LaunchHostProcess(ExEdit::Filter *efp, ExEdit::FilterProcInfo *efpip, HostS
     DbgPrint(_T("Launching host with command line: %s"), cmd_line);
 
     STARTUPINFO si = {sizeof(si)};
+#ifdef _DEBUG
+    if (!CreateProcess(NULL, cmd_line, NULL, NULL, FALSE, NULL, NULL, NULL, &si, &state.pi))
+#else
     if (!CreateProcess(NULL, cmd_line, NULL, NULL, FALSE, CREATE_NO_WINDOW, NULL, NULL, &si, &state.pi))
+#endif
+
     {
         DbgPrint(_T("CreateProcess failed: %lu."), GetLastError());
         return false;
