@@ -14,7 +14,7 @@ AviUtl の拡張編集に、外部のオーディオプラグイン（VST3, CLAP
   - 拡張編集 0.93rc1 等の他バージョンでは動作しません。
   - AviUtl2用は[こちら](https://github.com/Book-0225/aviutl2_External_Audio_Processing)。
 
-- Visual C++ 再頒布可能パッケージ（[2015/2017/2019/2022] の x86 対応版が必要）
+- Visual C++ 再頒布可能パッケージ（v14 の x86 対応版が必要）
   - https://learn.microsoft.com/ja-jp/cpp/windows/latest-supported-vc-redist
 
 - patch.aul の `r43 謎さうなフォーク版58` (`r43_ss_58`) 以降
